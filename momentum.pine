@@ -1,0 +1,195 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Ols87
+
+//@version=5
+
+indicator('Momentum')
+// ZONES
+int bull_level = 75
+int bear_level = 23
+color bull_color = color.red
+color bear_color = color.green
+hline(100, color = color.new(bull_color, 0), linestyle = hline.style_solid)
+hline(bull_level, color = color.new(bull_color, 60), linestyle = hline.style_dashed)
+hline(50, color=color.new(color.white, 70))
+hline(bear_level, color = color.new(bear_color, 60), linestyle = hline.style_dashed)
+hline(0, color = color.new(bear_color, 0), linestyle = hline.style_solid)
+// RSI
+series float rsi = ta.rsi(close, 7)
+// STOCH
+series float stoch = ta.sma(ta.stoch(close, high, low, 13), 3)
+// WAVES
+series float waves_high_low_close_3 = hlc3 
+series float waves_ema = ta.ema(waves_high_low_close_3, 13)
+series float waves_dma = ta.ema(math.abs(waves_high_low_close_3 - waves_ema), 13)
+float ci = (waves_high_low_close_3 - waves_ema) / (0.015 * waves_dma)
+series float waves = ta.ema(ci / 1.75, 21)  + 45
+// DI
+float di_range = math.max(math.max(high-low, math.abs(high-nz(close[1]))), math.abs(low-nz(close[1])))
+float di_plus_range = high-nz(high[1]) > nz(low[1])-low ? math.max(high-nz(high[1]), 0): 0
+float di_minus_range = nz(low[1])-low > high-nz(high[1]) ? math.max(nz(low[1])-low, 0): 0
+float smoothed_di_range = 0.0
+smoothed_di_range := nz(smoothed_di_range[1]) - (nz(smoothed_di_range[1]) / 7) + di_range
+float smoothed_di_plus = 0.0
+smoothed_di_plus := nz(smoothed_di_plus[1]) - (nz(smoothed_di_plus[1]) / 7) + di_plus_range
+float smoothed_di_minus = 0.0
+smoothed_di_minus := nz(smoothed_di_minus[1]) - (nz(smoothed_di_minus[1]) / 7) + di_minus_range
+float di_plus = smoothed_di_plus / smoothed_di_range * 144
+float di_minus = -(smoothed_di_minus / smoothed_di_range * 144) + 90
+float di = di_plus + ((di_minus - di_plus) / 2) * 1.1
+// PMARP
+var pmar_array = array.new<float>(377, na)
+f_pmar (float _price, simple int _len) =>
+    float ma = ta.ema (_price, _len) 
+    float pmar = _price / ma 
+f_pmarp (simple int _pmarp_len, float _pmar) => 
+    array.unshift (pmar_array, _pmar)
+    if array.size (pmar_array) > _pmarp_len + 1
+        array.pop (pmar_array)
+    float percentile = array.percentrank (pmar_array, 0)
+float pmar = f_pmar (close, 20)
+float pmarp = f_pmarp (377, pmar)
+// VOLUME
+series float typical = hlc3
+float inter = math.log(typical) - math.log(typical[1])
+series float vinter = ta.stdev(inter, 21)
+float cutoff = 0.21 * vinter * close
+series float vave = ta.sma(volume, 144)[1]
+float vmax = vave * 2.1
+float vc = volume < vmax ?  volume : vmax
+float mf = typical - typical[1]
+float vcp = mf > cutoff ? vc : (mf < -cutoff ? -vc : 0)
+float vfi = (math.sum(vcp , 144) / vave) + 55
+// BBWP
+f_bbwp (_price, _bbwLen, _bbwpLen) =>
+    float _basis = ta.ema (_price, _bbwLen)
+    float _dev = ta.stdev (_price, _bbwLen)
+    _bbw = (_basis + _dev - (_basis - _dev)) / _basis
+    _bbwSum = 0.0
+    _len = bar_index < _bbwpLen ? bar_index : _bbwpLen
+    for _i = 1 to _len by 1
+        _bbwSum += (_bbw[_i] > _bbw ? 0 : 1)
+        _bbwSum
+    _return = bar_index >= _bbwLen ? (_bbwSum / _len) * 100 : na
+    _return
+bbwp = f_bbwp (close, 22, 233)
+bbwp_ma = ta.ema (bbwp, 5)
+// VOLATILITY
+float volatility = (bbwp_ma / 2) * 2
+if volatility > 100 
+    volatility:= 100
+float volatility_ratio = volatility / 2
+volatility_upper = plot(volatility_ratio + 50, 'BBWP', color.new(color.orange, 100), style=plot.style_stepline)
+volatility_mid = plot(50, color= color.new(color.black, 100))
+volatility_lower = plot(100 - (volatility_ratio + 50), 'BBWP', color.new(color.orange, 100))
+fill(volatility_upper, volatility_mid, color.new(color.white, 80))
+fill(volatility_lower, volatility_mid, color.new(color.white, 80))
+// MOMENTUM
+float momentum = (((stoch + rsi + waves + di + pmarp + vfi) / 6) * 1.1) -5
+series float momentum_ma = ta.ema((momentum * 1.1) - 5 , 5)
+
+plot(momentum_ma, color = color.yellow)
+// DIVERGENCE
+pivot_low(float p) =>
+    na(ta.pivotlow(momentum_ma, p, p)) ? false : true
+pivot_high(float p) =>
+    na(ta.pivothigh(momentum_ma, p, p)) ? false : true
+mom_low(m,l) =>
+    m > ta.valuewhen(l, m, 1)
+price_low(p,l) =>
+    low[p] < ta.valuewhen(l, low[p], 1)
+hidden_price_high(p,l) =>
+    low[p] > ta.valuewhen(l, low[p], 1)
+mom_high(m,h) =>
+    m < ta.valuewhen(h, m, 1)
+price_high(p,h) =>
+    high[p] > ta.valuewhen(h, high[p], 1)
+hidden_price_low(p,h) =>
+    high[p] < ta.valuewhen(h, high[p], 1)
+div_color(condition, colr) =>
+    condition ? colr : color.new(color.white, 100)
+    
+p_3  = 3
+mom_3 = momentum_ma[p_3]
+low_3 = pivot_low(p_3)
+high_3 = pivot_high(p_3)
+bull_3 = price_low(p_3,low_3) and mom_low(mom_3,low_3) and low_3
+bear_3 = price_high(p_3,high_3) and mom_high(mom_3,high_3) and high_3
+hid_mom_low_3 = mom_low(mom_3,low_3) == false
+hid_price_low_3  = hidden_price_high(p_3, low_3)
+hid_bull_3 = hid_mom_low_3 and hid_price_low_3
+hid_mom_high_3 = mom_high(mom_3,high_3) == false
+hid_price_high_3  =  hidden_price_low(p_3,high_3)
+hid_bear_3 = hid_mom_high_3 and hid_price_high_3
+plot(low_3 ? mom_3 : na, offset=-p_3, color=div_color(bull_3, color.green))
+plot(high_3 ? mom_3 : na, offset=-p_3, color=div_color(bear_3, color.red))
+plot(low_3 ? mom_3 : na, offset=-p_3, color=div_color(hid_bull_3, color.green))
+plot(high_3 ? mom_3 : na, offset=-p_3, color=div_color(hid_bear_3, color.red))
+
+p_5  = 5
+mom_5 = momentum_ma[p_5]
+low_5 = pivot_low(p_5)
+high_5 = pivot_high(p_5)
+bull_5 = price_low(p_5,low_5) and mom_low(mom_5,low_5) and low_5
+bear_5 = price_high(p_5,high_5) and mom_high(mom_5,high_5) and high_5
+hid_mom_low_5 = mom_low(mom_5,low_5) == false
+hid_price_low_5  = hidden_price_high(p_5, low_5)
+hid_bull_5 = hid_mom_low_5 and hid_price_low_5
+hid_mom_high_5 = mom_high(mom_5,high_5) == false
+hid_price_high_5  =  hidden_price_low(p_5,high_5)
+hid_bear_5 = hid_mom_high_5 and hid_price_high_5
+plot(low_5 ? mom_5 : na, offset=-p_5, color=div_color(bull_5, color.green))
+plot(high_5 ? mom_5 : na, offset=-p_5, color=div_color(bear_5, color.red))
+plot(low_5 ? mom_5 : na, offset=-p_5, color=div_color(hid_bull_5, color.green))
+plot(high_5 ? mom_5 : na, offset=-p_5, color=div_color(hid_bear_5, color.red))
+
+p_7  = 7
+mom_7 = momentum_ma[p_7]
+low_7 = pivot_low(p_7)
+high_7 = pivot_high(p_7)
+bull_7 = price_low(p_7,low_7) and mom_low(mom_7,low_7) and low_7
+bear_7 = price_high(p_7,high_7) and mom_high(mom_7,high_7) and high_7
+hid_mom_low_7 = mom_low(mom_7,low_7) == false
+hid_price_low_7  = hidden_price_high(p_7, low_7)
+hid_bull_7 = hid_mom_low_7 and hid_price_low_7
+hid_mom_high_7 = mom_high(mom_7,high_7) == false
+hid_price_high_7  =  hidden_price_low(p_7,high_7)
+hid_bear_7 = hid_mom_high_7 and hid_price_high_7
+plot(low_7 ? mom_7 : na, offset=-p_7, color=div_color(bull_7, color.green))
+plot(high_7 ? mom_7 : na, offset=-p_7, color=div_color(bear_7, color.red))
+plot(low_7 ? mom_7 : na, offset=-p_7, color=div_color(hid_bull_7, color.green))
+plot(high_7 ? mom_7 : na, offset=-p_7, color=div_color(hid_bear_7, color.red))
+
+p_13  = 13
+mom_13 = momentum_ma[p_13]
+low_13 = pivot_low(p_13)
+high_13 = pivot_high(p_13)
+bull_13 = price_low(p_13,low_13) and mom_low(mom_13,low_13) and low_13
+bear_13 = price_high(p_13,high_13) and mom_high(mom_13,high_13) and high_13
+hid_mom_low_13 = mom_low(mom_13,low_13) == false
+hid_price_low_13  = hidden_price_high(p_13, low_13)
+hid_bull_13 = hid_mom_low_13 and hid_price_low_13
+hid_mom_high_13 = mom_high(mom_13,high_13) == false
+hid_price_high_13  =  hidden_price_low(p_13,high_13)
+hid_bear_13 = hid_mom_high_13 and hid_price_high_13
+plot(low_13 ? mom_13 : na, offset=-p_13, color=div_color(bull_13, color.green))
+plot(high_13 ? mom_13 : na, offset=-p_13, color=div_color(bear_13, color.red))
+plot(low_13 ? mom_13 : na, offset=-p_13, color=div_color(hid_bull_13, color.green))
+plot(high_13 ? mom_13 : na, offset=-p_13, color=div_color(hid_bear_13, color.red))
+
+p_21  = 21
+mom_21 = momentum_ma[p_21]
+low_21 = pivot_low(p_21)
+high_21 = pivot_high(p_21)
+bull_21 = price_low(p_21,low_21) and mom_low(mom_21,low_21) and low_21
+bear_21 = price_high(p_21,high_21) and mom_high(mom_21,high_21) and high_21
+hid_mom_low_21 = mom_low(mom_21,low_21) == false
+hid_price_low_21  = hidden_price_high(p_21, low_21)
+hid_bull_21 = hid_mom_low_21 and hid_price_low_21
+hid_mom_high_21 = mom_high(mom_21,high_21) == false
+hid_price_high_21  =  hidden_price_low(p_21,high_21)
+hid_bear_21 = hid_mom_high_21 and hid_price_high_21
+plot(low_21 ? mom_21 : na, offset=-p_21, color=div_color(bull_21, color.green))
+plot(high_21 ? mom_21 : na, offset=-p_21, color=div_color(bear_21, color.red))
+plot(low_21 ? mom_21 : na, offset=-p_21, color=div_color(hid_bull_21, color.green))
+plot(high_21 ? mom_21 : na, offset=-p_21, color=div_color(hid_bear_21, color.red))
