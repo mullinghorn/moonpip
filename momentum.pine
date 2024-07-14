@@ -6,7 +6,7 @@
 indicator('Momentum')
 // ZONES
 int bull_level = 75
-int bear_level = 23
+int bear_level = 25
 color bull_color = color.red
 color bear_color = color.green
 hline(100, color = color.new(bull_color, 0), linestyle = hline.style_solid)
