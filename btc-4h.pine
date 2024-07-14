@@ -2,7 +2,7 @@
 strategy("BTC - 4H", overlay = true, initial_capital = 1000, currency = 'USD', default_qty_type = strategy.percent_of_equity, default_qty_value = 100)
 // ZONES
 int bull_level = 75
-int bear_level = 23
+int bear_level = 25
 // RSI
 series float rsi = ta.rsi(close, 7)
 // STOCH
@@ -83,17 +83,28 @@ plot(mid_ma, color=color)
 // STRATEGY
 mom_rev_up = momentum > momentum[1] and momentum[2] > momentum[1]
 mom_rev_down = momentum < momentum[1] and momentum[1] < momentum[2]
+
 long = mom_rev_up and momentum[1] < bear_level
 long_BBWP = bbwp > 13 and bbwp_ma > bbwp_ma[1] and bbwp_ma[2] < bear_level
+long_signal = (long or long_BBWP) and bull_trend
 long_close = momentum_ma[2] > bull_level and momentum_ma[1] > bear_level and momentum_ma < bull_level
+long_bail = momentum[1] > bear_level and momentum < bear_level and close < mid_ma
+plotshape(long_signal, style=shape.labelup, color=color.green, size=size.tiny, location=location.belowbar)
+plotshape(long_close, style=shape.xcross, color=color.orange, size=size.tiny, location=location.abovebar)
+
 short = mom_rev_down and momentum[1] > bull_level
 short_BBWP = bbwp > 13 and bbwp_ma > bbwp_ma[1] and bbwp_ma[2] < bear_level
+short_signal = (short or short_BBWP) and bear_trend
 short_close = momentum_ma[2] < bear_level  and momentum_ma[1] < bear_level and momentum_ma > bear_level
-if (long or long_BBWP) and bull_trend
+short_bail = momentum[1] > bull_level and momentum < bull_level and close > mid_ma
+plotshape(short_signal, style=shape.labeldown, color=color.red, size=size.tiny, location=location.abovebar)
+plotshape(short_close, style=shape.xcross, color=color.yellow, size=size.tiny, location=location.belowbar)
+
+if long_signal
     strategy.entry("LONG", strategy.long, qty = strategy.equity * 1 / close)
-if long_close or bear_trend 
+if long_close or bear_trend or long_bail
     strategy.close("LONG")
-if (short_BBWP) and bear_trend
+if short_signal
     strategy.entry("SHORT", strategy.short, qty = strategy.equity * 1 / close)
-if short_close or bull_trend
+if short_close or bull_trend or short_bail
     strategy.close("SHORT")
