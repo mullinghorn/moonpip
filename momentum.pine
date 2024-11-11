@@ -94,107 +94,37 @@ series float momentum_ma = ta.ema((momentum * 1.1) - 5 , 5)
 plot(momentum, color = color.white)
 plot(momentum_ma, color = color.yellow)
 
-// DIVERGENCE
-pivot_low(float p) =>
-    na(ta.pivotlow(momentum, p, p)) ? false : true
-pivot_high(float p) =>
-    na(ta.pivothigh(momentum, p, p)) ? false : true
-mom_low(m,l) =>
-    m > ta.valuewhen(l, m, 1)
-price_low(p,l) =>
-    low[p] < ta.valuewhen(l, low[p], 1)
-hidden_price_high(p,l) =>
-    low[p] > ta.valuewhen(l, low[p], 1)
-mom_high(m,h) =>
-    m < ta.valuewhen(h, m, 1)
-price_high(p,h) =>
-    high[p] > ta.valuewhen(h, high[p], 1)
-hidden_price_low(p,h) =>
-    high[p] < ta.valuewhen(h, high[p], 1)
-div_color(condition, colr) =>
-    condition ? colr : color.new(color.white, 100)
-    
-p_3  = 3
-mom_3 = momentum[p_3]
-low_3 = pivot_low(p_3)
-high_3 = pivot_high(p_3)
-bull_3 = price_low(p_3,low_3) and mom_low(mom_3,low_3) and low_3
-bear_3 = price_high(p_3,high_3) and mom_high(mom_3,high_3) and high_3
-hid_mom_low_3 = mom_low(mom_3,low_3) == false
-hid_price_low_3  = hidden_price_high(p_3, low_3)
-hid_bull_3 = hid_mom_low_3 and hid_price_low_3
-hid_mom_high_3 = mom_high(mom_3,high_3) == false
-hid_price_high_3  =  hidden_price_low(p_3,high_3)
-hid_bear_3 = hid_mom_high_3 and hid_price_high_3
-plot(low_3 ? mom_3 : na, offset=-p_3, color=div_color(bull_3, color.green))
-plot(high_3 ? mom_3 : na, offset=-p_3, color=div_color(bear_3, color.red))
-plot(low_3 ? mom_3 : na, offset=-p_3, color=div_color(hid_bull_3, color.green))
-plot(high_3 ? mom_3 : na, offset=-p_3, color=div_color(hid_bear_3, color.red))
+lbR = 5
+lbL = 5
+rangeUpper = 144
+rangeLower = 5
 
-p_5  = 5
-mom_5 = momentum[p_5]
-low_5 = pivot_low(p_5)
-high_5 = pivot_high(p_5)
-bull_5 = price_low(p_5,low_5) and mom_low(mom_5,low_5) and low_5
-bear_5 = price_high(p_5,high_5) and mom_high(mom_5,high_5) and high_5
-hid_mom_low_5 = mom_low(mom_5,low_5) == false
-hid_price_low_5  = hidden_price_high(p_5, low_5)
-hid_bull_5 = hid_mom_low_5 and hid_price_low_5
-hid_mom_high_5 = mom_high(mom_5,high_5) == false
-hid_price_high_5  =  hidden_price_low(p_5,high_5)
-hid_bear_5 = hid_mom_high_5 and hid_price_high_5
-plot(low_5 ? mom_5 : na, offset=-p_5, color=div_color(bull_5, color.green))
-plot(high_5 ? mom_5 : na, offset=-p_5, color=div_color(bear_5, color.red))
-plot(low_5 ? mom_5 : na, offset=-p_5, color=div_color(hid_bull_5, color.green))
-plot(high_5 ? mom_5 : na, offset=-p_5, color=div_color(hid_bear_5, color.red))
+_inRange(cond) =>
+    bars = ta.barssince(cond == true)
+    rangeLower <= bars and bars <= rangeUpper
 
-p_7  = 7
-mom_7 = momentum[p_7]
-low_7 = pivot_low(p_7)
-high_7 = pivot_high(p_7)
-bull_7 = price_low(p_7,low_7) and mom_low(mom_7,low_7) and low_7
-bear_7 = price_high(p_7,high_7) and mom_high(mom_7,high_7) and high_7
-hid_mom_low_7 = mom_low(mom_7,low_7) == false
-hid_price_low_7  = hidden_price_high(p_7, low_7)
-hid_bull_7 = hid_mom_low_7 and hid_price_low_7
-hid_mom_high_7 = mom_high(mom_7,high_7) == false
-hid_price_high_7  =  hidden_price_low(p_7,high_7)
-hid_bear_7 = hid_mom_high_7 and hid_price_high_7
-plot(low_7 ? mom_7 : na, offset=-p_7, color=div_color(bull_7, color.green))
-plot(high_7 ? mom_7 : na, offset=-p_7, color=div_color(bear_7, color.red))
-plot(low_7 ? mom_7 : na, offset=-p_7, color=div_color(hid_bull_7, color.green))
-plot(high_7 ? mom_7 : na, offset=-p_7, color=div_color(hid_bear_7, color.red))
+plFound = na(ta.pivotlow(momentum, lbL, lbR)) ? false : true
+phFound = na(ta.pivothigh(momentum, lbL, lbR)) ? false : true
+momentumHL = momentum[lbR] > ta.valuewhen(plFound, momentum[lbR], 1) and _inRange(plFound[1])
+momentumLL = momentum[lbR] < ta.valuewhen(plFound, momentum[lbR], 1) and _inRange(plFound[1])
+momentumHH = momentum[lbR] > ta.valuewhen(phFound, momentum[lbR], 1) and _inRange(phFound[1])
+momentumLH = momentum[lbR] < ta.valuewhen(phFound, momentum[lbR], 1) and _inRange(phFound[1])
+priceLL = low[lbR] < ta.valuewhen(plFound, low[lbR], 1)
+priceHL = low[lbR] > ta.valuewhen(plFound, low[lbR], 1)
+priceHH = high[lbR] > ta.valuewhen(phFound, high[lbR], 1)
+priceLH = high[lbR] < ta.valuewhen(phFound, high[lbR], 1)
+bullCond =  priceLL and momentumHL and plFound
+hiddenBullCond = priceHL and momentumLL and plFound
+bearCond = priceHH and momentumLH and phFound
+hiddenBearCond = priceLH and momentumHH and phFound
 
-p_13  = 13
-mom_13 = momentum[p_13]
-low_13 = pivot_low(p_13)
-high_13 = pivot_high(p_13)
-bull_13 = price_low(p_13,low_13) and mom_low(mom_13,low_13) and low_13
-bear_13 = price_high(p_13,high_13) and mom_high(mom_13,high_13) and high_13
-hid_mom_low_13 = mom_low(mom_13,low_13) == false
-hid_price_low_13  = hidden_price_high(p_13, low_13)
-hid_bull_13 = hid_mom_low_13 and hid_price_low_13
-hid_mom_high_13 = mom_high(mom_13,high_13) == false
-hid_price_high_13  =  hidden_price_low(p_13,high_13)
-hid_bear_13 = hid_mom_high_13 and hid_price_high_13
-plot(low_13 ? mom_13 : na, offset=-p_13, color=div_color(bull_13, color.green))
-plot(high_13 ? mom_13 : na, offset=-p_13, color=div_color(bear_13, color.red))
-plot(low_13 ? mom_13 : na, offset=-p_13, color=div_color(hid_bull_13, color.green))
-plot(high_13 ? mom_13 : na, offset=-p_13, color=div_color(hid_bear_13, color.red))
+bearColor = color.red
+bullColor = color.green
+hiddenBullColor = color.rgb(26, 214, 158)
+hiddenBearColor = color.rgb(238, 123, 29)
+noneColor = color.new(color.white, 100)
 
-p_21  = 21
-mom_21 = momentum[p_21]
-low_21 = pivot_low(p_21)
-high_21 = pivot_high(p_21)
-bull_21 = price_low(p_21,low_21) and mom_low(mom_21,low_21) and low_21
-bear_21 = price_high(p_21,high_21) and mom_high(mom_21,high_21) and high_21
-hid_mom_low_21 = mom_low(mom_21,low_21) == false
-hid_price_low_21  = hidden_price_high(p_21, low_21)
-hid_bull_21 = hid_mom_low_21 and hid_price_low_21
-hid_mom_high_21 = mom_high(mom_21,high_21) == false
-hid_price_high_21  =  hidden_price_low(p_21,high_21)
-hid_bear_21 = hid_mom_high_21 and hid_price_high_21
-plot(low_21 ? mom_21 : na, offset=-p_21, color=div_color(bull_21, color.green))
-plot(high_21 ? mom_21 : na, offset=-p_21, color=div_color(bear_21, color.red))
-plot(low_21 ? mom_21 : na, offset=-p_21, color=div_color(hid_bull_21, color.green))
-plot(high_21 ? mom_21 : na, offset=-p_21, color=div_color(hid_bear_21, color.red))
+plot(plFound ? momentum[lbR] : na, offset = -lbR, color = bullCond ? bullColor : noneColor)
+plot(plFound ? momentum[lbR] : na, offset = -lbR, color = hiddenBullCond ? hiddenBullColor : noneColor)
+plot(phFound ? momentum[lbR] : na, offset = -lbR, color = bearCond ? bearColor : noneColor)
+plot(phFound ? momentum[lbR] : na, offset = -lbR, color = hiddenBearCond ? hiddenBearColor : noneColor)
